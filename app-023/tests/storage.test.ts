@@ -50,6 +50,16 @@ describe('曲目 CRUD', () => {
     expect(got!.title).toBe('改名');
     expect(got!.bpm).toBe(140);
   });
+
+  it('散板标记与全部字段存取不丢', async () => {
+    const score = { ...scoreFromPattern(PATTERNS[0]), freeMeter: true };
+    await saveScore(score);
+    const got = await getScore(score.id);
+    expect(got!.freeMeter).toBe(true);
+    // 再关掉也能存住（不被默认值覆盖）
+    await saveScore({ ...score, freeMeter: false });
+    expect((await getScore(score.id))!.freeMeter).toBe(false);
+  });
 });
 
 describe('设置持久化', () => {

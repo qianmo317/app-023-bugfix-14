@@ -16,7 +16,8 @@ export function ScoreList() {
   }, []);
 
   const create = async () => {
-    const s = newEmptyScore(title.trim() || '未命名锣鼓段');
+    // 首页选的拍号与散板一并生效
+    const s = { ...newEmptyScore(title.trim() || '未命名锣鼓段', bpb), freeMeter: free };
     await saveScore(s);
     setTitle('');
     window.location.hash = `#/score/${s.id}`;

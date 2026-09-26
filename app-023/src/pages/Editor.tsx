@@ -34,20 +34,40 @@ export function Editor({ scoreId, onNavigate }: Props) {
     });
   }, [scoreId]);
 
-  // 自动保存（防抖）
+  const scoreRef = useRef<Score | null>(null);
+  scoreRef.current = score;
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+
+  // 自动保存（防抖 400ms）：每次内容变更后落盘，并刷新「已保存」时间
   const saveTimer = useRef<number>(0);
   useEffect(() => {
     if (!score) return;
     const timer = window.setTimeout(() => {
-      saveScore(score);
+      void saveScore(score).then(() => setSavedAt(new Date().toLocaleTimeString('zh-CN')));
     }, 400);
     saveTimer.current = timer;
+    return () => window.clearTimeout(timer);
   }, [score]);
+
+  // 离开编辑器（切路由）时兜底：把最后一版内容连同更新时间一起存下，避免末尾改动丢失
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(saveTimer.current);
+      const s = scoreRef.current;
+      if (s) void saveScore(s);
+    };
+  }, []);
 
   const instId = selectedInst ?? score?.instruments[0]?.id ?? null;
 
   const patch = useCallback((fn: (s: Score) => Score) => {
-    setScore((s) => (s ? fn(s) : s));
+    setScore((s) => {
+      if (!s) return s;
+      const next = fn(s);
+      // 每次有效改动都刷新更新时间，列表才能按更新时间排对
+      return next === s ? s : { ...next, updatedAt: Date.now() };
+    });
   }, []);
 
   const editBar = useCallback(
@@ -106,10 +126,6 @@ export function Editor({ scoreId, onNavigate }: Props) {
     },
     [],
   );
-  const scoreRef = useRef<Score | null>(null);
-  scoreRef.current = score;
-  const durationRef = useRef(duration);
-  durationRef.current = duration;
 
   const toggleRest = useCallback(
     (barIdx: number, tick: number) => {

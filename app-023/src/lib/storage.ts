@@ -47,17 +47,8 @@ export async function getScore(id: string): Promise<Score | undefined> {
 }
 
 export async function saveScore(score: Score): Promise<void> {
-  await tx(STORE_SCORES, 'readwrite', (s) =>
-    s.put({
-      id: score.id,
-      title: score.title,
-      style: score.style,
-      bpm: score.bpm,
-      bars: score.bars,
-      instruments: score.instruments,
-      updatedAt: score.updatedAt,
-    }),
-  );
+  // 整条落盘（含 freeMeter 等扩展字段），避免丢字段
+  await tx(STORE_SCORES, 'readwrite', (s) => s.put({ ...score }));
 }
 
 export async function deleteScore(id: string): Promise<void> {
