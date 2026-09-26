@@ -29,25 +29,85 @@ export function Editor({ scoreId, onNavigate }: Props) {
   const audio = useAudio(score ?? ({ bars: [] } as unknown as Score));
 
   useEffect(() => {
+    let cancelled = false;
     getScore(scoreId).then((s) => {
-      if (s) setScore(s);
+      if (!cancelled && s) setScore(s);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [scoreId]);
 
-  // 自动保存（防抖）
-  const saveTimer = useRef<number>(0);
+  const scoreRef = useRef<Score | null>(null);
+  scoreRef.current = score;
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+
+  // 自动保存：400ms 防抖；每次编辑都盖上当前时间，连同内容一起写入
+  const saveTimer = useRef<number | undefined>(undefined);
+  const dirtyRef = useRef<Score | null>(null);
+  const mountedRef = useRef(true);
+
+  const flushSave = useCallback(async () => {
+    if (saveTimer.current !== undefined) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = undefined;
+    }
+    const pending = dirtyRef.current;
+    if (!pending) return;
+    dirtyRef.current = null;
+    try {
+      await saveScore(pending);
+      if (mountedRef.current) {
+        setSavedAt(
+          new Date(pending.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        );
+      }
+    } catch {
+      // 落盘失败：把待存内容留着，下一次编辑或切页时重试
+      dirtyRef.current = pending;
+      if (mountedRef.current) setErr('自动保存失败，请检查浏览器存储权限');
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // SPA 内切页（组件卸载）：立即同步发起落盘，不等防抖
+      void flushSave();
+    };
+  }, [flushSave]);
+
   useEffect(() => {
     if (!score) return;
-    const timer = window.setTimeout(() => {
-      saveScore(score);
+    if (saveTimer.current !== undefined) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      void flushSave();
     }, 400);
-    saveTimer.current = timer;
-  }, [score]);
+  }, [score, flushSave]);
+
+  // 关闭/刷新标签页：尽力把最后未落盘的改动写进去（不 await）
+  useEffect(() => {
+    const onHide = () => {
+      if (dirtyRef.current) void saveScore(dirtyRef.current).catch(() => {});
+    };
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, []);
 
   const instId = selectedInst ?? score?.instruments[0]?.id ?? null;
 
+  /** 所有编辑的唯一入口：改内容的同时刷新 updatedAt，并标记为待保存 */
   const patch = useCallback((fn: (s: Score) => Score) => {
-    setScore((s) => (s ? fn(s) : s));
+    const cur = scoreRef.current;
+    if (!cur) return;
+    const changed = fn(cur);
+    if (changed === cur) return; // 无实际改动（回调原样返回）：不刷新时间、不触发保存
+    const next: Score = { ...changed, updatedAt: Date.now() };
+    scoreRef.current = next;
+    dirtyRef.current = next;
+    setScore(next);
   }, []);
 
   const editBar = useCallback(
@@ -106,10 +166,6 @@ export function Editor({ scoreId, onNavigate }: Props) {
     },
     [],
   );
-  const scoreRef = useRef<Score | null>(null);
-  scoreRef.current = score;
-  const durationRef = useRef(duration);
-  durationRef.current = duration;
 
   const toggleRest = useCallback(
     (barIdx: number, tick: number) => {
@@ -268,7 +324,7 @@ export function Editor({ scoreId, onNavigate }: Props) {
           );
           return nb;
         });
-        return { ...s, bars, freeMeter: bpb === 0 ? s.freeMeter : s.freeMeter };
+        return { ...s, bars };
       });
     },
     [patch],

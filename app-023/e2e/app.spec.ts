@@ -14,6 +14,19 @@ test.describe('曲目列表', () => {
     await expect(page.getByTestId('score-title')).toHaveValue('E2E 开道锣');
     await expect(page.getByTestId('grid')).toBeVisible();
   });
+
+  test('新建时选择的拍号与散板会带进编辑器', async ({ page }) => {
+    await page.goto('#/');
+    await page.getByTestId('new-title').fill('E2E 散板三拍');
+    await page.getByTestId('new-bpb').selectOption('3');
+    await page.getByTestId('new-free').check();
+    await page.getByTestId('btn-create').click();
+    await expect(page.getByTestId('editor-page')).toBeVisible();
+    await expect(page.getByTestId('beats-per-bar')).toHaveValue('3');
+    await expect(page.getByTestId('chk-freemeter')).toBeChecked();
+    // 谱面带散板标记
+    await expect(page.getByTestId('grid-freemeter-mark')).toBeVisible();
+  });
 });
 
 test.describe('录入与齐奏', () => {
@@ -164,6 +177,48 @@ test.describe('持久化', () => {
     page.once('dialog', (d) => d.accept());
     await row.getByTestId(/del-sc_/).click();
     await expect(page.locator('tr', { hasText: 'E2E 待删除' })).toHaveCount(0);
+  });
+
+  test('改动后显示已保存时间、列表更新时间随编辑刷新', async ({ page }) => {
+    await createEmptyScore(page, 'E2E 更新时间');
+    await page.getByTestId('grid-cell-0-0').click();
+    await page.keyboard.type('z');
+    // 自动保存后右上角回显「已保存 HH:MM」
+    await expect(page.getByTestId('saved-at')).toContainText('已保存', { timeout: 5000 });
+    await page.waitForTimeout(500);
+    await page.goto('#/');
+    const row = page.locator('tr', { hasText: 'E2E 更新时间' });
+    await expect(row).toBeVisible();
+    // 更新时间就是今天，不再停留在旧值
+    await expect(row.locator('td').nth(5)).toContainText(
+      new Date().toLocaleDateString('zh-CN'),
+    );
+  });
+
+  test('改完立刻切走页面，最后改动不丢（卸载时强制落盘）', async ({ page }) => {
+    await createEmptyScore(page, 'E2E 快速切页');
+    await page.getByTestId('grid-cell-0-0').click();
+    await page.keyboard.type('z');
+    // 不等 400ms 防抖，立刻切到曲目列表
+    await page.goto('#/');
+    await page.getByRole('link', { name: 'E2E 快速切页' }).click();
+    await expect(page.getByTestId('editor-page')).toBeVisible();
+    await expect(page.getByTestId('grid-glyph-0-0-gu')).toBeVisible();
+  });
+
+  test('散板勾选存盘后重开不丢，打印页也按散板标', async ({ page }) => {
+    await createEmptyScore(page, 'E2E 散板存盘');
+    await page.getByTestId('chk-freemeter').check();
+    await expect(page.getByTestId('grid-freemeter-mark')).toBeVisible();
+    await page.waitForTimeout(700); // 等自动保存
+    await page.reload();
+    await expect(page.getByTestId('editor-page')).toBeVisible();
+    await expect(page.getByTestId('chk-freemeter')).toBeChecked();
+    await expect(page.getByTestId('grid-freemeter-mark')).toBeVisible();
+    await page.getByTestId('btn-print').click();
+    await expect(page.getByTestId('print-page')).toBeVisible();
+    await expect(page.locator('.print-sub')).toContainText('散板');
+    await expect(page.getByTestId('print-freemeter-mark')).toBeVisible();
   });
 });
 

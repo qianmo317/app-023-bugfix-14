@@ -86,7 +86,13 @@ export function scoreFromPattern(p: PatternDef, instruments: Instrument[] = DEFA
   };
 }
 
-export function newEmptyScore(title: string, beatsPerBar = 4, barCount = 4, instruments = DEFAULT_INSTRUMENTS): Score {
+export function newEmptyScore(
+  title: string,
+  beatsPerBar = 4,
+  barCount = 4,
+  freeMeter = false,
+  instruments = DEFAULT_INSTRUMENTS,
+): Score {
   const bars: Bar[] = Array.from({ length: barCount }, (_, i) => emptyBar(i, beatsPerBar));
   return {
     id: newId(),
@@ -94,7 +100,7 @@ export function newEmptyScore(title: string, beatsPerBar = 4, barCount = 4, inst
     bpm: 100,
     bars,
     instruments,
-    freeMeter: false,
+    freeMeter,
     updatedAt: Date.now(),
   };
 }

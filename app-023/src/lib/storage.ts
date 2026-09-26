@@ -55,6 +55,7 @@ export async function saveScore(score: Score): Promise<void> {
       bpm: score.bpm,
       bars: score.bars,
       instruments: score.instruments,
+      freeMeter: score.freeMeter,
       updatedAt: score.updatedAt,
     }),
   );

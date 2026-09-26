@@ -94,10 +94,24 @@ export function ScoreGrid({
         return (
           <g key={barIndex} data-testid={`${testIdPrefix}-bar-${barIndex}`}>
             {/* 小节号 */}
-            <text x={gx} y={y + 12} fontSize={12} fill="#666">
+            <text x={gx + (score.freeMeter && barIndex === 0 ? 18 : 0)} y={y + 12} fontSize={12} fill="#666">
               {barIndex + 1}
               {bar.tempoNote ? `（${bar.tempoNote}）` : ''}
             </text>
+            {/* 散板标记：首小节起始处的红色「散」 */}
+            {score.freeMeter && barIndex === 0 && (
+              <text
+                x={gx}
+                y={y + 12}
+                fontSize={13}
+                fill="#b30000"
+                fontWeight={700}
+                textAnchor="middle"
+                data-testid={`${testIdPrefix}-freemeter-mark`}
+              >
+                散
+              </text>
+            )}
             {/* 每行乐器 */}
             {instruments.map((inst, r) => {
               const rowY = y + gridTop + r * rowHeight;
@@ -243,23 +257,24 @@ export function ScoreGrid({
                 })}
               </g>
             )}
-            {/* 拍线（灰）与格线（浅灰） */}
-            {Array.from({ length: barTicks(bar.beatsPerBar) + 1 }, (_, t) => {
-              const lx = gx + t * pxPerTick;
-              const isBeat = t % TICKS_PER_BEAT === 0;
-              const isBar = t === barTicks(bar.beatsPerBar);
-              return (
-                <line
-                  key={t}
-                  x1={lx}
-                  y1={y + gridTop}
-                  x2={lx}
-                  y2={y + gridTop + rows * rowHeight}
-                  stroke={isBar ? '#c0392b' : isBeat ? '#c9c9c9' : '#eee'}
-                  strokeWidth={isBar ? 2 : isBeat ? 1 : 0.5}
-                />
-              );
-            })}
+            {/* 拍线（灰）与格线（浅灰）；散板不画严格拍格，只留小节外框 */}
+            {!score.freeMeter &&
+              Array.from({ length: barTicks(bar.beatsPerBar) + 1 }, (_, t) => {
+                const lx = gx + t * pxPerTick;
+                const isBeat = t % TICKS_PER_BEAT === 0;
+                const isBar = t === barTicks(bar.beatsPerBar);
+                return (
+                  <line
+                    key={t}
+                    x1={lx}
+                    y1={y + gridTop}
+                    x2={lx}
+                    y2={y + gridTop + rows * rowHeight}
+                    stroke={isBar ? '#c0392b' : isBeat ? '#c9c9c9' : '#eee'}
+                    strokeWidth={isBar ? 2 : isBeat ? 1 : 0.5}
+                  />
+                );
+              })}
             {/* 外框 */}
             <rect
               x={gx}

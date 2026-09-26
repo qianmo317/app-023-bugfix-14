@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteScore, getScore, listScores, loadSettings, saveScore, saveSettings } from '../src/lib/storage';
-import { scoreFromPattern, PATTERNS, defaultSettings } from '../src/lib/factory';
+import { newEmptyScore, scoreFromPattern, PATTERNS, defaultSettings } from '../src/lib/factory';
 
 beforeEach(async () => {
   // 清空所有库
@@ -49,6 +49,33 @@ describe('曲目 CRUD', () => {
     const got = await getScore(score.id);
     expect(got!.title).toBe('改名');
     expect(got!.bpm).toBe(140);
+  });
+
+  it('散板标记随曲目一起落盘、读回不丢', async () => {
+    const score = scoreFromPattern(PATTERNS[0]);
+    score.freeMeter = true;
+    await saveScore(score);
+    const got = await getScore(score.id);
+    expect(got!.freeMeter).toBe(true);
+  });
+
+  it('新建空白谱带上拍号与散板选择', () => {
+    const s = newEmptyScore('散板 2/4', 2, 4, true);
+    expect(s.bars[0].beatsPerBar).toBe(2);
+    expect(s.bars).toHaveLength(4);
+    expect(s.freeMeter).toBe(true);
+  });
+
+  it('覆盖保存带上新的更新时间后，列表顺序随之变化', async () => {
+    const a = scoreFromPattern(PATTERNS[0]);
+    const b = scoreFromPattern(PATTERNS[1]);
+    await saveScore(a);
+    await saveScore(b);
+    await new Promise((r) => setTimeout(r, 20));
+    a.updatedAt = Date.now();
+    await saveScore(a);
+    const list = await listScores();
+    expect(list.map((s) => s.id)).toEqual([a.id, b.id]);
   });
 });
 

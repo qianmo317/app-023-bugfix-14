@@ -16,9 +16,11 @@ export function ScoreList() {
   }, []);
 
   const create = async () => {
-    const s = newEmptyScore(title.trim() || '未命名锣鼓段');
+    const s = newEmptyScore(title.trim() || '未命名锣鼓段', bpb, 4, free);
     await saveScore(s);
     setTitle('');
+    setBpb(4);
+    setFree(false);
     window.location.hash = `#/score/${s.id}`;
   };
 
